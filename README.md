@@ -18,17 +18,25 @@ A **FastAPI backend** for a car marketplace with **AI-powered search** — searc
 
 ## How It Works
 
-```
-Voice/Text Query
-      │
-      ▼
-[Faster Whisper]  ←── (voice only, transcribes audio to text)
-      │
-      ▼
-[Groq LLM - Llama 3.3 70B]  ←── converts natural language to PostgreSQL SELECT
-      │
-      ▼
-[PostgreSQL / MySQL Database]  ←── executes query, returns car results
+```mermaid
+flowchart TD
+  U[User Query - Text or Voice]
+  API[FastAPI App]
+  W[Voice Transcription - Faster Whisper]
+  L[LLM Service - text to SQL]
+  V[SQL Validation - only SELECT]
+  DB[Database]
+  R[Results]
+
+  U --> API
+  API -->|voice upload| W
+  API -->|text query| L
+  W --> L
+  L --> V
+  V --> DB
+  DB --> R
+  R --> API
+  API --> U
 ```
 
 ## System Diagram
@@ -37,60 +45,47 @@ Below is a high-level system diagram showing request flows for text search, voic
 
 ```mermaid
 flowchart LR
-      subgraph Client[Client]
-            A[User (Browser / Mobile / CLI)]
-      end
+  subgraph Client
+    A(User)
+  end
 
-      subgraph API[FastAPI App]
-            direction TB
-            B[Auth Router (/register, /login)]
-            C[Cars Router (/cars, /cars/ai-search, /cars/voice-search)]
-            D[Users Router (/users)]
-      end
+  subgraph API
+    direction TB
+    B(Auth Router)
+    C(Cars Router)
+    D(Users Router)
+  end
 
-      subgraph Services[AI & Voice Services]
-            direction TB
-            E[Voice Service\n(Faster Whisper)]
-            F[LLM Service\n(Groq / Llama via API)]
-      end
+  subgraph Services
+    direction TB
+    E(Voice Service - Whisper)
+    F(LLM Service)
+  end
 
-      subgraph DB[Database]
-            G[(PostgreSQL / MySQL)]
-      end
+  DB[(Database)]
 
-      A -->|HTTP request| API
-      API --> B
-      API --> C
-      API --> D
+  A -->|HTTP request| API
+  API --> B
+  API --> C
+  API --> D
 
-      %% Text search flow
-      A -->|GET /cars/ai-search?query=...| C
-      C -->|calls| F
-      F -->|returns JSON { sql }| C
-      C -->|execute_raw_query| DB
-      DB -->|results| C
-      C -->|response| A
+  A -->|Text ai-search| C
+  C -->|call LLM| F
+  F -->|return sql| C
+  C -->|execute raw query| DB
+  DB -->|results| C
+  C -->|response| A
 
-      %% Voice search flow
-      A -->|POST /cars/voice-search (audio file)| C
-      C -->|save temp file & call| E
-      E -->|transcribed text| C
-      C -->|call| F
-      F -->|returns JSON { sql }| C
-      C -->|execute_raw_query| DB
-      DB -->|results| C
-      C -->|response (transcribed_text, query, results)| A
+  A -->|Voice upload| C
+  C -->|call Whisper| E
+  E -->|transcript| C
+  C -->|call LLM| F
 
-      %% Auth-protected actions
-      A -->|POST /login| B
-      B -->|issues JWT| A
-      A -->|use JWT| C
-      C -->|Depends on|get_current_user (JWT validation)| B
-      C -->|create/update/delete| DB
+  A -->|login| B
+  B -->|issue JWT| A
+  A -->|use JWT| C
 
-      %% Notes
-      classDef notes fill:#f9f,stroke:#333,stroke-width:1px;
-      class G notes;
+  classDef notes fill:#f9f,stroke:#333,stroke-width:1px;
 ```
 
 ## Voice & LLM Processing (Detailed)
@@ -130,12 +125,10 @@ flowchart LR
       L1 --> L2 --> L3 --> L4 --> R1 --> R2 --> R3 --> DB
       DB --> R3 --> R1
 
-      classDef info fill:#eef,stroke:#333,stroke-width:1px;
-      note1(Model: Llama 3.3 (Groq API) | Temperature: 0 | Response: JSON):::info
-      LLM --- note1
 ```
 
-The LLM only generates `SELECT` queries — write operations (`INSERT`, `UPDATE`, `DELETE`, `DROP`, etc.) are blocked before execution.
+LLM settings: Model = Llama 3.3 (Groq API), Temperature = 0, Response format = JSON
+```
 
 The LLM only generates `SELECT` queries — write operations (`INSERT`, `UPDATE`, `DELETE`, `DROP`, etc.) are blocked before execution.
 
