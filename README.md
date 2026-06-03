@@ -45,48 +45,50 @@ Below is a high-level system diagram showing request flows for text search, voic
 
 ```mermaid
 flowchart LR
-  subgraph Client
-    A(User)
-  end
+subgraph Client
+  A(User)
+end
 
-  subgraph API
-    direction TB
-    B(Auth Router)
-    C(Cars Router)
-    D(Users Router)
-  end
+subgraph API
+  direction TB
+  B(Auth Router)
+  C(Cars Router)
+  D(Users Router)
+end
 
-  subgraph Services
-    direction TB
-    E(Voice Service - Whisper)
-    F(LLM Service)
-  end
+subgraph Services
+  direction TB
+  E(Voice Service - Whisper)
+  F(LLM Service)
+end
 
-  DB[(Database)]
+DB[(Database)]
 
-  A -->|HTTP request| API
-  API --> B
-  API --> C
-  API --> D
+A -->|HTTP request| API
+API --> B
+API --> C
+API --> D
 
-  A -->|Text ai-search| C
-  C -->|call LLM| F
-  F -->|return sql| C
-  C -->|execute raw query| DB
-  DB -->|results| C
-  C -->|response| A
+A -->|Text ai-search| C
+C -->|call LLM| F
+F -->|return sql| C
+C -->|execute raw query| DB
+DB -->|results| C
+C -->|response| A
 
-  A -->|Voice upload| C
-  C -->|call Whisper| E
-  E -->|transcript| C
-  C -->|call LLM| F
+A -->|Voice upload| C
+C -->|call Whisper| E
+E -->|transcript| C
+C -->|call LLM| F
 
-  A -->|login| B
-  B -->|issue JWT| A
-  A -->|use JWT| C
+A -->|login| B
+B -->|issue JWT| A
+A -->|use JWT| C
 
-  classDef notes fill:#f9f,stroke:#333,stroke-width:1px;
+classDef notes fill:#f9f,stroke:#333,stroke-width:1px;
 ```
+
+
 
 ## Voice & LLM Processing (Detailed)
 
@@ -94,45 +96,43 @@ This diagram shows the detailed internal flow for voice (audio) and text queries
 
 ```mermaid
 flowchart LR
-      subgraph VoicePath[Voice Path]
-            A1(Audio File uploaded)
-            A2(Save temp file)
-            A3(Faster Whisper)
-            A4(Transcribed text)
-      end
+subgraph VoicePath[Voice Path]
+A1(Audio File uploaded)
+A2(Save temp file)
+A3(Faster Whisper)
+A4(Transcribed text)
+end
 
-      subgraph TextPath[Text Path]
-            T1(User text query)
-      end
+subgraph TextPath[Text Path]
+T1(User text query)
+end
 
-      subgraph LLM[LLM Service]
-            L1(Receive text)
-            L2(Apply SYSTEM_PROMPT checks: Language EN/IT; Relevance; Prompt injection; Gibberish)
-            L3(Generate PostgreSQL SELECT)
-            L4(Return JSON with sql field)
-      end
+subgraph LLM[LLM Service]
+L1(Receive text)
+L2(Apply SYSTEM_PROMPT checks: Language EN/IT; Relevance; Prompt injection; Gibberish)
+L3(Generate PostgreSQL SELECT)
+L4(Return JSON with sql field)
+end
 
-      subgraph Backend[FastAPI / Router]
-            R1(Cars Router)
-            R2(Validate SQL - only SELECT allowed)
-            R3(Execute raw query -> DB)
-      end
+subgraph Backend[FastAPI / Router]
+R1(Cars Router)
+R2(Validate SQL - only SELECT allowed)
+R3(Execute raw query -> DB)
+end
 
-      DB[(PostgreSQL / MySQL)]
+DB[(PostgreSQL / MySQL)]
 
-      A1 --> A2 --> A3 --> A4 --> L1
-      T1 --> L1
-      L1 --> L2 --> L3 --> L4 --> R1 --> R2 --> R3 --> DB
-      DB --> R3 --> R1
+A1 --> A2 --> A3 --> A4 --> L1
+T1 --> L1
+L1 --> L2 --> L3 --> L4 --> R1 --> R2 --> R3 --> DB
+DB --> R3 --> R1
 
 ```
 
 LLM settings: Model = Llama 3.3 (Groq API), Temperature = 0, Response format = JSON
-```
 
 The LLM only generates `SELECT` queries — write operations (`INSERT`, `UPDATE`, `DELETE`, `DROP`, etc.) are blocked before execution.
 
----
 
 ## Project Structure
 
