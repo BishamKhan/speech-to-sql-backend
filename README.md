@@ -99,48 +99,43 @@ This diagram shows the detailed internal flow for voice (audio) and text queries
 
 ```mermaid
 flowchart LR
-      subgraph Voice[Voice Path]
-            direction TB
-            A1[Audio File (uploaded)]
-            A2[Save temp file]
-            A3[Faster Whisper (WhisperModel)]
-            A4[Transcribed Text]
+      subgraph VoicePath[Voice Path]
+            A1(Audio File uploaded)
+            A2(Save temp file)
+            A3(Faster Whisper)
+            A4(Transcribed text)
       end
 
-      subgraph Text[Text Path]
-            direction TB
-            T1[User Text Query]
+      subgraph TextPath[Text Path]
+            T1(User text query)
       end
 
       subgraph LLM[LLM Service]
-            direction TB
-            L1[Receive text]
-            L2[Apply SYSTEM_PROMPT checks:\n- Language (EN/IT)\n- Relevance (car search only)\n- Prompt injection\n- Gibberish detection]
-            L3[Generate PostgreSQL SELECT]\n+    L4[Return JSON {"sql": "..."}]
+            L1(Receive text)
+            L2(Apply SYSTEM_PROMPT checks: Language EN/IT; Relevance; Prompt injection; Gibberish)
+            L3(Generate PostgreSQL SELECT)
+            L4(Return JSON with sql field)
       end
 
       subgraph Backend[FastAPI / Router]
-            direction TB
-            R1[Cars Router (/cars/ai-search, /cars/voice-search)]
-            R2[Validate SQL (only SELECT allowed)]
-            R3[execute_raw_query -> DB]
+            R1(Cars Router)
+            R2(Validate SQL - only SELECT allowed)
+            R3(Execute raw query -> DB)
       end
 
-      subgraph DB[(PostgreSQL / MySQL)]
-      end
+      DB[(PostgreSQL / MySQL)]
 
-      A1 --> A2 --> A3 --> A4
-      A4 --> L1
+      A1 --> A2 --> A3 --> A4 --> L1
       T1 --> L1
-      L1 --> L2 --> L3 --> L4
-      L4 --> R1 --> R2 --> R3 --> DB
+      L1 --> L2 --> L3 --> L4 --> R1 --> R2 --> R3 --> DB
       DB --> R3 --> R1
 
-      %% Notes about LLM settings
       classDef info fill:#eef,stroke:#333,stroke-width:1px;
-      note1[Model: Llama 3.3 (Groq API)\nTemperature: 0\nResponse format: JSON object]:::info
+      note1(Model: Llama 3.3 (Groq API) | Temperature: 0 | Response: JSON):::info
       LLM --- note1
 ```
+
+The LLM only generates `SELECT` queries — write operations (`INSERT`, `UPDATE`, `DELETE`, `DROP`, etc.) are blocked before execution.
 
 The LLM only generates `SELECT` queries — write operations (`INSERT`, `UPDATE`, `DELETE`, `DROP`, etc.) are blocked before execution.
 
