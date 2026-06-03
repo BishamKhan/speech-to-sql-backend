@@ -1,6 +1,6 @@
 # Car Marketplace Backend
 
-A **FastAPI backend** for a car marketplace with **AI-powered search** — search cars using natural language text or voice audio, which gets transcribed and converted into SQL queries via an LLM.
+A car marketplace with **AI-powered search** — search cars using natural language text or voice audio, which gets transcribed and converted into SQL queries via an LLM.
 
 ---
 
