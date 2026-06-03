@@ -31,6 +31,117 @@ Voice/Text Query
 [PostgreSQL / MySQL Database]  ←── executes query, returns car results
 ```
 
+## System Diagram
+
+Below is a high-level system diagram showing request flows for text search, voice search, authentication, and database interactions.
+
+```mermaid
+flowchart LR
+      subgraph Client[Client]
+            A[User (Browser / Mobile / CLI)]
+      end
+
+      subgraph API[FastAPI App]
+            direction TB
+            B[Auth Router (/register, /login)]
+            C[Cars Router (/cars, /cars/ai-search, /cars/voice-search)]
+            D[Users Router (/users)]
+      end
+
+      subgraph Services[AI & Voice Services]
+            direction TB
+            E[Voice Service\n(Faster Whisper)]
+            F[LLM Service\n(Groq / Llama via API)]
+      end
+
+      subgraph DB[Database]
+            G[(PostgreSQL / MySQL)]
+      end
+
+      A -->|HTTP request| API
+      API --> B
+      API --> C
+      API --> D
+
+      %% Text search flow
+      A -->|GET /cars/ai-search?query=...| C
+      C -->|calls| F
+      F -->|returns JSON { sql }| C
+      C -->|execute_raw_query| DB
+      DB -->|results| C
+      C -->|response| A
+
+      %% Voice search flow
+      A -->|POST /cars/voice-search (audio file)| C
+      C -->|save temp file & call| E
+      E -->|transcribed text| C
+      C -->|call| F
+      F -->|returns JSON { sql }| C
+      C -->|execute_raw_query| DB
+      DB -->|results| C
+      C -->|response (transcribed_text, query, results)| A
+
+      %% Auth-protected actions
+      A -->|POST /login| B
+      B -->|issues JWT| A
+      A -->|use JWT| C
+      C -->|Depends on|get_current_user (JWT validation)| B
+      C -->|create/update/delete| DB
+
+      %% Notes
+      classDef notes fill:#f9f,stroke:#333,stroke-width:1px;
+      class G notes;
+```
+
+## Voice & LLM Processing (Detailed)
+
+This diagram shows the detailed internal flow for voice (audio) and text queries: how audio is transcribed by Faster Whisper, how the LLM receives the text with strict system checks, and how the resulting SQL is validated and executed.
+
+```mermaid
+flowchart LR
+      subgraph Voice[Voice Path]
+            direction TB
+            A1[Audio File (uploaded)]
+            A2[Save temp file]
+            A3[Faster Whisper (WhisperModel)]
+            A4[Transcribed Text]
+      end
+
+      subgraph Text[Text Path]
+            direction TB
+            T1[User Text Query]
+      end
+
+      subgraph LLM[LLM Service]
+            direction TB
+            L1[Receive text]
+            L2[Apply SYSTEM_PROMPT checks:\n- Language (EN/IT)\n- Relevance (car search only)\n- Prompt injection\n- Gibberish detection]
+            L3[Generate PostgreSQL SELECT]\n+    L4[Return JSON {"sql": "..."}]
+      end
+
+      subgraph Backend[FastAPI / Router]
+            direction TB
+            R1[Cars Router (/cars/ai-search, /cars/voice-search)]
+            R2[Validate SQL (only SELECT allowed)]
+            R3[execute_raw_query -> DB]
+      end
+
+      subgraph DB[(PostgreSQL / MySQL)]
+      end
+
+      A1 --> A2 --> A3 --> A4
+      A4 --> L1
+      T1 --> L1
+      L1 --> L2 --> L3 --> L4
+      L4 --> R1 --> R2 --> R3 --> DB
+      DB --> R3 --> R1
+
+      %% Notes about LLM settings
+      classDef info fill:#eef,stroke:#333,stroke-width:1px;
+      note1[Model: Llama 3.3 (Groq API)\nTemperature: 0\nResponse format: JSON object]:::info
+      LLM --- note1
+```
+
 The LLM only generates `SELECT` queries — write operations (`INSERT`, `UPDATE`, `DELETE`, `DROP`, etc.) are blocked before execution.
 
 ---
