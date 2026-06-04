@@ -19,7 +19,9 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 
 pwd_context = CryptContext(
-    schemes=["bcrypt_sha256"],
+    # Use pbkdf2_sha256 for new hashes (no 72-byte bcrypt limit),
+    # but keep bcrypt_sha256 so existing hashes still verify.
+    schemes=["pbkdf2_sha256", "bcrypt_sha256"],
     deprecated="auto"
 )
 
